@@ -4,7 +4,7 @@ import { criarEvento } from "@/lib/googleCalendar";
 
 export async function GET(request) {
   const session = await auth();
-  if (!session?.atendenteId) {
+  if (!session?.user) {
     return Response.json({ error: "Não autorizado" }, { status: 401 });
   }
 
@@ -48,7 +48,7 @@ export async function GET(request) {
 
 export async function POST(request) {
   const session = await auth();
-  if (!session?.atendenteId) {
+  if (!session?.user) {
     return Response.json({ error: "Não autorizado" }, { status: 401 });
   }
 

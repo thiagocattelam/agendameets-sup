@@ -145,9 +145,9 @@ export default function DashboardClient() {
     const fim = new Date(dataFim + "T23:59:59").toISOString();
     const params = new URLSearchParams({ inicio, fim, pageSize: "500" });
     fetch(`/api/agendamentos?${params}`)
-      .then((r) => r.json())
+      .then((r) => (r.ok ? r.json() : { data: [] }))
       .then(({ data }) => {
-        setAgendamentosPeriodo(data);
+        setAgendamentosPeriodo(data ?? []);
         setLoadingPeriodo(false);
       });
   }, [dataInicio, dataFim]);
@@ -164,9 +164,9 @@ export default function DashboardClient() {
     const fim = new Date(ultimoDia + "T23:59:59").toISOString();
     const params = new URLSearchParams({ inicio, fim, pageSize: "2000" });
     fetch(`/api/agendamentos?${params}`)
-      .then((r) => r.json())
+      .then((r) => (r.ok ? r.json() : { data: [] }))
       .then(({ data }) => {
-        setAgendamentosMes(data);
+        setAgendamentosMes(data ?? []);
         setLoadingMes(false);
       });
   }, []);

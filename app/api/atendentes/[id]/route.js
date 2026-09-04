@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 
 export async function PUT(request, { params }) {
   const session = await auth();
-  if (!session?.atendenteId) {
+  if (!session?.user) {
     return Response.json({ error: "Não autorizado" }, { status: 401 });
   }
 
@@ -19,7 +19,7 @@ export async function PUT(request, { params }) {
 
 export async function DELETE(_, { params }) {
   const session = await auth();
-  if (!session?.atendenteId) {
+  if (!session?.user) {
     return Response.json({ error: "Não autorizado" }, { status: 401 });
   }
 

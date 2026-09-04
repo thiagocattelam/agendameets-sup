@@ -17,7 +17,7 @@ async function findOrCreate(model, where, create) {
 
 export async function POST() {
   const session = await auth();
-  if (!session?.atendenteId) {
+  if (!session?.user) {
     return Response.json({ error: "Não autorizado" }, { status: 401 });
   }
 

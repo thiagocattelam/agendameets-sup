@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 
 export async function GET() {
   const session = await auth();
-  if (!session?.atendenteId) {
+  if (!session?.user) {
     return Response.json({ error: "Não autorizado" }, { status: 401 });
   }
 
