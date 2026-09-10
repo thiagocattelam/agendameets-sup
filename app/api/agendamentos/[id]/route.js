@@ -1,6 +1,6 @@
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { criarEvento, atualizarEvento, apagarEvento } from "@/lib/googleCalendar";
+import { criarEvento, atualizarEvento, apagarEvento, getAtendenteComTokens } from "@/lib/googleCalendar";
 
 export async function PUT(request, { params }) {
   const session = await auth();
@@ -12,10 +12,7 @@ export async function PUT(request, { params }) {
   const { dataHoraInicio, dataHoraFim, cliente, linkUmbler, observacoes, alertaMinutos, atendenteId, statusId, assuntoIds } =
     await request.json();
 
-  const anterior = await prisma.agendamento.findUnique({
-    where: { id },
-    include: { atendente: true },
-  });
+  const anterior = await prisma.agendamento.findUnique({ where: { id } });
 
   const agendamento = await prisma.agendamento.update({
     where: { id },
@@ -34,15 +31,17 @@ export async function PUT(request, { params }) {
   });
 
   const trocouAtendente = anterior && anterior.atendenteId !== agendamento.atendenteId;
+  const atendenteComTokens = await getAtendenteComTokens(agendamento.atendenteId);
 
   if (trocouAtendente) {
-    await apagarEvento(anterior.atendente, anterior.googleEventId);
-    const googleEventId = await criarEvento(agendamento.atendente, agendamento);
+    const atendenteAnteriorComTokens = await getAtendenteComTokens(anterior.atendenteId);
+    await apagarEvento(atendenteAnteriorComTokens, anterior.googleEventId);
+    const googleEventId = await criarEvento(atendenteComTokens, agendamento);
     await prisma.agendamento.update({ where: { id }, data: { googleEventId } });
   } else if (agendamento.googleEventId) {
-    await atualizarEvento(agendamento.atendente, agendamento);
+    await atualizarEvento(atendenteComTokens, agendamento);
   } else {
-    const googleEventId = await criarEvento(agendamento.atendente, agendamento);
+    const googleEventId = await criarEvento(atendenteComTokens, agendamento);
     if (googleEventId) {
       await prisma.agendamento.update({ where: { id }, data: { googleEventId } });
     }
@@ -59,13 +58,11 @@ export async function DELETE(_, { params }) {
 
   const { id } = await params;
 
-  const agendamento = await prisma.agendamento.findUnique({
-    where: { id },
-    include: { atendente: true },
-  });
+  const agendamento = await prisma.agendamento.findUnique({ where: { id } });
 
   if (agendamento) {
-    await apagarEvento(agendamento.atendente, agendamento.googleEventId);
+    const atendenteComTokens = await getAtendenteComTokens(agendamento.atendenteId);
+    await apagarEvento(atendenteComTokens, agendamento.googleEventId);
   }
 
   await prisma.agendamento.delete({ where: { id } });

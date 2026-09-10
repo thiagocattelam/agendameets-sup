@@ -1,6 +1,6 @@
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { criarEvento } from "@/lib/googleCalendar";
+import { criarEvento, getAtendenteComTokens } from "@/lib/googleCalendar";
 
 export async function GET(request) {
   const session = await auth();
@@ -70,7 +70,8 @@ export async function POST(request) {
     include: { atendente: true },
   });
 
-  const googleEventId = await criarEvento(agendamento.atendente, agendamento);
+  const atendenteComTokens = await getAtendenteComTokens(agendamento.atendenteId);
+  const googleEventId = await criarEvento(atendenteComTokens, agendamento);
   if (googleEventId) {
     await prisma.agendamento.update({ where: { id: agendamento.id }, data: { googleEventId } });
   }
