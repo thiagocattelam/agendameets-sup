@@ -1,6 +1,6 @@
 "use client";
 
-import { Home, Tag, Users, LogOut, CalendarDays } from "lucide-react";
+import { Home, Tag, Users, LogOut, CalendarDays, AlertCircle } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Menu, X } from "lucide-react";
@@ -66,6 +66,9 @@ export default function Header() {
   // Estado da conexão com o Google Agenda do atendente logado
   const [googleConectado, setGoogleConectado] = useState(null);
 
+  // Mensagem de erro exibida ao tentar conectar sem um Atendente vinculado ao e-mail logado
+  const [erroConexao, setErroConexao] = useState(null);
+
   // Fecha a sidebar ao clicar fora dela
   useEffect(() => {
     if (!isOpen) return;
@@ -99,18 +102,29 @@ export default function Header() {
       .catch(() => {});
   }, [popoverAberto, session?.atendenteId]);
 
-  // Avisa se a tentativa de conexão falhou por ser uma conta Google diferente do login
+  // Avisa se a tentativa de conexão com o Google Agenda falhou
   useEffect(() => {
+    if (!session?.user) return;
     const params = new URLSearchParams(window.location.search);
-    if (params.get("googleCalendarErro") === "email_mismatch") {
-      alert("Conecte com a mesma conta Google usada no login para poder sincronizar sua agenda.");
-      params.delete("googleCalendarErro");
-      const query = params.toString();
-      window.history.replaceState(null, "", window.location.pathname + (query ? `?${query}` : ""));
+    const erro = params.get("googleCalendarErro");
+    if (!erro) return;
+
+    if (erro === "email_mismatch") {
+      setErroConexao("Conecte com a mesma conta Google usada no login para poder sincronizar sua agenda.");
+    } else if (erro === "sem_atendente") {
+      setErroConexao(`Nenhum cadastro de atendente com o e-mail ${session.user.email} informado.`);
     }
-  }, []);
+
+    params.delete("googleCalendarErro");
+    const query = params.toString();
+    window.history.replaceState(null, "", window.location.pathname + (query ? `?${query}` : ""));
+  }, [session?.user]);
 
   function conectarGoogleAgenda() {
+    if (!session.atendenteId) {
+      setErroConexao(`Nenhum cadastro de atendente com o e-mail ${session.user.email} informado.`);
+      return;
+    }
     window.location.href = "/api/google-calendar/connect";
   }
 
@@ -120,6 +134,7 @@ export default function Header() {
   }
 
   return (
+    <>
     <aside
       ref={ref}
       className={`${isOpen ? "w-[280px]" : "w-[60px]"} fixed top-0 left-0 z-40 h-screen overflow-y-auto bg-white border-r border-gray-200 flex flex-col transition-all duration-200`}
@@ -217,29 +232,25 @@ export default function Header() {
                     {session.user.email}
                   </p>
 
-                  {session.atendenteId && (
-                    <>
-                      <hr className="mb-2" />
-                      <div className="mb-2">
-                        {googleConectado && (
-                          <span
-                            className="flex items-center gap-1.5 w-fit text-xs font-semibold px-2.5 py-1 rounded-full mb-1.5"
-                            style={{ backgroundColor: "#22c55e22", color: "#16a34a" }}
-                          >
-                            <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: "#16a34a" }} />
-                            Google Agenda conectada
-                          </span>
-                        )}
-                        <button
-                          onClick={googleConectado ? desconectarGoogleAgenda : conectarGoogleAgenda}
-                          className="flex items-center gap-3 px-3 py-[8px] rounded-lg text-sm font-semibold text-gray-500 hover:bg-gray-100 hover:text-gray-800 transition-colors duration-150 w-full"
-                        >
-                          <CalendarDays size={16} className="shrink-0" />
-                          {googleConectado ? "Desconectar" : "Conectar Google Agenda"}
-                        </button>
-                      </div>
-                    </>
-                  )}
+                  <hr className="mb-2" />
+                  <div className="mb-2">
+                    {googleConectado && (
+                      <span
+                        className="flex items-center gap-1.5 w-fit text-xs font-semibold px-2.5 py-1 rounded-full mb-1.5"
+                        style={{ backgroundColor: "#22c55e22", color: "#16a34a" }}
+                      >
+                        <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: "#16a34a" }} />
+                        Google Agenda conectada
+                      </span>
+                    )}
+                    <button
+                      onClick={googleConectado ? desconectarGoogleAgenda : conectarGoogleAgenda}
+                      className="flex items-center gap-3 px-3 py-[8px] rounded-lg text-sm font-semibold text-gray-500 hover:bg-gray-100 hover:text-gray-800 transition-colors duration-150 w-full"
+                    >
+                      <CalendarDays size={16} className="shrink-0" />
+                      {googleConectado ? "Desconectar" : "Conectar Google Agenda"}
+                    </button>
+                  </div>
 
                   <hr className="mb-2" />
                   <button
@@ -255,5 +266,37 @@ export default function Header() {
         </div>
       )}
     </aside>
+
+    {erroConexao && (
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+        <div className="bg-white rounded-xl w-full max-w-sm shadow-lg">
+          <div className="flex items-center justify-between px-6 pt-5 pb-4">
+            <h2 className="text-lg font-semibold flex items-center gap-2 text-red-600">
+              <AlertCircle size={20} className="shrink-0" />
+              Google Agenda
+            </h2>
+            <button
+              onClick={() => setErroConexao(null)}
+              className="text-gray-400 hover:text-gray-700 transition-colors"
+            >
+              <X size={18} />
+            </button>
+          </div>
+          <div className="px-6 pb-6 flex flex-col gap-4">
+            <p className="text-sm text-gray-600">{erroConexao}</p>
+            <div className="flex justify-end">
+              <button
+                onClick={() => setErroConexao(null)}
+                className="px-4 py-2 rounded-xl text-white text-sm"
+                style={{ backgroundColor: "#8b47ff" }}
+              >
+                Entendi
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    )}
+    </>
   );
 }
