@@ -23,10 +23,18 @@ model Atendente{
   createdAt DateTime @default(now())
   agendamentos Agendamento[]
 
-  googleAccessToken String?
-  googleRefreshToken String?
-  googleTokenExpiry DateTime?
   googleCalendarConectado Boolean @default(false)
+  googleCredencial GoogleCredencial?
+}
+
+model GoogleCredencial{
+  id String @id @default(cuid())
+  accessToken String?
+  refreshToken String?
+  tokenExpiry DateTime?
+
+  atendente Atendente @relation(fields: [atendenteId], references: [id], onDelete: Cascade)
+  atendenteId String @unique
 }
 model Agendamento{
   id String @id @default(cuid())

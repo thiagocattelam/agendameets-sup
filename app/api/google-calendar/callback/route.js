@@ -31,13 +31,19 @@ export async function GET(request) {
     return Response.redirect(new URL("/?googleCalendarErro=email_mismatch", request.url));
   }
 
+  const dadosCredencial = {
+    accessToken: tokens.access_token,
+    refreshToken: tokens.refresh_token ?? undefined,
+    tokenExpiry: tokens.expiry_date ? new Date(tokens.expiry_date) : null,
+  };
+
   await prisma.atendente.update({
     where: { id: session.atendenteId },
     data: {
-      googleAccessToken: tokens.access_token,
-      googleRefreshToken: tokens.refresh_token ?? undefined,
-      googleTokenExpiry: tokens.expiry_date ? new Date(tokens.expiry_date) : null,
       googleCalendarConectado: true,
+      googleCredencial: {
+        upsert: { create: dadosCredencial, update: dadosCredencial },
+      },
     },
   });
 
