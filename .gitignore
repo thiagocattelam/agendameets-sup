@@ -1,6 +1,7 @@
 node_modules
 .next
 .env
-.env.*
+.env.development
+.env.production
 !.env.example
 .vscode
