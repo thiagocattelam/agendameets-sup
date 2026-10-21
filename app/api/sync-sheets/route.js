@@ -40,7 +40,7 @@ export async function POST() {
       const nomesAssuntos = nomeAssunto.split(",").map((s) => s.trim()).filter(Boolean);
 
       const [atendente, status, assuntos] = await Promise.all([
-        findOrCreate("atendente", { nome: nomeAtendente }, { nome: nomeAtendente, ativo: true }),
+        findOrCreate("usuario", { nome: nomeAtendente }, { nome: nomeAtendente, ativo: true }),
         findOrCreate("status", { descricao: nomeStatus }, { descricao: nomeStatus, corHex: "#6b7280" }),
         Promise.all(nomesAssuntos.map((desc) => findOrCreate("assunto", { descricao: desc }, { descricao: desc }))),
       ]);

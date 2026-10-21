@@ -1,11 +1,10 @@
-import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { autenticar, semPermissao } from "@/lib/autorizacao";
 
 export async function GET() {
-  const session = await auth();
-  if (!session?.user) {
-    return Response.json({ error: "Não autorizado" }, { status: 401 });
-  }
+  const { ability, erro } = await autenticar();
+  if (erro) return erro;
+  if (ability.cannot("read", "Status")) return semPermissao();
 
   const status = await prisma.status.findMany({
     orderBy: { descricao: "asc" },

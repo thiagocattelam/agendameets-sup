@@ -1,16 +1,21 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
 import { X, ChevronDown } from "lucide-react";
-import AtendenteModal from "../../../components/AtendenteModal";
+import { useSession } from "next-auth/react";
+import UsuarioModal from "../../../components/UsuarioModal";
 import Skeleton from "../../../components/Skeleton";
+import { useAbility } from "@/hooks/useAbility";
+import { PERFIS } from "@/lib/permissoes";
 
-export default function AtendentesClient() {
-  const [atendentes, setAtendentes] = useState([]);
+export default function UsuariosClient() {
+  const { data: session } = useSession();
+  const ability = useAbility();
+  const [usuarios, setUsuarios] = useState([]);
   const [loading, setLoading] = useState(true);
   const [modalAberto, setModalAberto] = useState(false);
-  const [atendenteSelecionado, setAtendenteSelecionado] = useState(null);
+  const [usuarioSelecionado, setUsuarioSelecionado] = useState(null);
   const [modalDeleteAberto, setModalDeleteAberto] = useState(false);
-  const [atendenteDeletar, setAtendenteDeletar] = useState(null);
+  const [usuarioDeletar, setUsuarioDeletar] = useState(null);
   const [menuAberto, setMenuAberto] = useState(null);
   const menuRef = useRef(null);
   const filtroDropdownRef = useRef(null);
@@ -19,15 +24,15 @@ export default function AtendentesClient() {
   const [filtroAtivo, setFiltroAtivo] = useState("ativos");
   const [pendingToggle, setPendingToggle] = useState({});
 
-  async function carregarAtendentes() {
-    const res = await fetch("/api/atendentes");
+  async function carregarUsuarios() {
+    const res = await fetch("/api/usuarios");
     const data = await res.json();
-    setAtendentes(data);
+    setUsuarios(data);
     setLoading(false);
   }
 
   useEffect(() => {
-    carregarAtendentes();
+    carregarUsuarios();
   }, []);
 
   useEffect(() => {
@@ -43,77 +48,79 @@ export default function AtendentesClient() {
     return () => document.removeEventListener("mousedown", handleClickFora);
   }, []);
 
-  async function handleToggleAtivo(atendente) {
-    const novoAtivo = !atendente.ativo;
-    setPendingToggle((prev) => ({ ...prev, [atendente.id]: novoAtivo }));
-    await fetch(`/api/atendentes/${atendente.id}`, {
+  async function handleToggleAtivo(usuario) {
+    const novoAtivo = !usuario.ativo;
+    setPendingToggle((prev) => ({ ...prev, [usuario.id]: novoAtivo }));
+    await fetch(`/api/usuarios/${usuario.id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        nome: atendente.nome,
+        nome: usuario.nome,
         ativo: novoAtivo,
-        email: atendente.email,
-        alertaMinutos: atendente.alertaMinutos,
+        email: usuario.email,
+        alertaMinutos: usuario.alertaMinutos,
       }),
     });
     setTimeout(() => {
-      carregarAtendentes();
-      setPendingToggle((prev) => { const n = { ...prev }; delete n[atendente.id]; return n; });
+      carregarUsuarios();
+      setPendingToggle((prev) => { const n = { ...prev }; delete n[usuario.id]; return n; });
     }, 700);
   }
 
   function handleAdicionar() {
-    setAtendenteSelecionado(null);
+    setUsuarioSelecionado(null);
     setModalAberto(true);
   }
 
-  function handleEditar(atendente) {
-    setAtendenteSelecionado(atendente);
+  function handleEditar(usuario) {
+    setUsuarioSelecionado(usuario);
     setModalAberto(true);
     setMenuAberto(null);
   }
 
-  function handleConfirmarExcluir(atendente) {
-    setAtendenteDeletar(atendente);
+  function handleConfirmarExcluir(usuario) {
+    setUsuarioDeletar(usuario);
     setModalDeleteAberto(true);
     setMenuAberto(null);
   }
 
   async function handleExcluir() {
-    await fetch(`/api/atendentes/${atendenteDeletar.id}`, { method: "DELETE" });
+    await fetch(`/api/usuarios/${usuarioDeletar.id}`, { method: "DELETE" });
     setModalDeleteAberto(false);
-    setAtendenteDeletar(null);
-    carregarAtendentes();
+    setUsuarioDeletar(null);
+    carregarUsuarios();
   }
 
   function handleSalvar() {
-    carregarAtendentes();
+    carregarUsuarios();
   }
 
   return (
     <div className="max-w-4xl mx-auto px-6 py-8">
       <div className="flex justify-between items-center mb-6">
         <div>
-          <h2 className="text-2xl font-semibold text-gray-800">Atendentes</h2>
+          <h2 className="text-2xl font-semibold text-gray-800">Usuários</h2>
           <p className="text-sm text-gray-400 mt-0.5">
             {loading ? (
               <Skeleton className="h-4 w-20 inline-block align-middle" />
             ) : (
               <>
-                {atendentes
+                {usuarios
                   .filter((a) => filtroAtivo === "ativos" ? a.ativo : filtroAtivo === "inativos" ? !a.ativo : true)
                   .filter((a) => a.nome.toLowerCase().includes(busca.toLowerCase())).length} registros
               </>
             )}
           </p>
         </div>
-        <button
-          onClick={handleAdicionar}
-          className="text-white px-4 py-2 rounded-xl text-sm font-medium transition hover:opacity-90"
-          style={{ backgroundColor: "#8b47ff" }}
-        >
-          + Adicionar
-        </button>
+        {ability.can("create", "Usuario") && (
+          <button
+            onClick={handleAdicionar}
+            className="text-white px-4 py-2 rounded-xl text-sm font-medium transition hover:opacity-90"
+            style={{ backgroundColor: "#8b47ff" }}
+          >
+            + Adicionar
+          </button>
+        )}
       </div>
 
       <div className="bg-white border border-gray-200 rounded-2xl px-5 py-3 shadow-sm mb-6 flex flex-wrap items-center justify-between gap-3">
@@ -162,6 +169,9 @@ export default function AtendentesClient() {
                 Nome
               </th>
               <th className="text-left px-8 py-3 text-sm font-semibold text-gray-600">
+                Perfil
+              </th>
+              <th className="text-left px-8 py-3 text-sm font-semibold text-gray-600">
                 Ativo
               </th>
               <th className="px-6 py-3" />
@@ -177,12 +187,15 @@ export default function AtendentesClient() {
                   </div>
                 </td>
                 <td className="px-6 py-4">
+                  <Skeleton className="h-5 w-16 rounded-full" />
+                </td>
+                <td className="px-6 py-4">
                   <Skeleton className="h-5 w-9 rounded-full" />
                 </td>
                 <td className="px-6 py-4" />
               </tr>
             ))}
-            {!loading && atendentes
+            {!loading && usuarios
               .filter((a) => filtroAtivo === "ativos" ? a.ativo : filtroAtivo === "inativos" ? !a.ativo : true)
               .filter((a) => a.nome.toLowerCase().includes(busca.toLowerCase()))
               .map((a) => (
@@ -204,9 +217,17 @@ export default function AtendentesClient() {
                     </div>
                   </td>
                   <td className="px-6 py-4">
+                    <span
+                      className={`text-xs font-semibold px-2.5 py-1 rounded-full ${a.perfil === "GESTAO" ? "bg-purple-100 text-purple-700" : "bg-gray-100 text-gray-600"}`}
+                    >
+                      {PERFIS[a.perfil] ?? a.perfil}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4">
                     <button
                       onClick={() => handleToggleAtivo(a)}
-                      className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+                      disabled={!ability.can("update", "Usuario") || a.id === session?.usuarioId}
+                      className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
                         (pendingToggle[a.id] ?? a.ativo) ? "bg-green-500" : "bg-gray-300"
                       }`}
                     >
@@ -218,6 +239,7 @@ export default function AtendentesClient() {
                     </button>
                   </td>
                   <td className="px-6 py-4 text-right relative">
+                    {(ability.can("update", "Usuario") || ability.can("manage", "Permissao") || ability.can("delete", "Usuario")) && (
                     <button
                       onClick={() =>
                         setMenuAberto(menuAberto === a.id ? null : a.id)
@@ -226,23 +248,28 @@ export default function AtendentesClient() {
                     >
                       ⋮
                     </button>
+                    )}
                     {menuAberto === a.id && (
                       <div
                         ref={menuRef}
                         className="absolute right-6 top-10 bg-white border border-gray-200 rounded-lg shadow-lg z-10 min-w-36 overflow-hidden"
                       >
-                        <button
-                          onClick={() => handleEditar(a)}
-                          className="w-full text-left px-5 py-4 text-sm text-gray-700 hover:bg-gray-50 border-b border-gray-100"
-                        >
-                          Editar
-                        </button>
-                        <button
-                          onClick={() => handleConfirmarExcluir(a)}
-                          className="w-full text-left px-5 py-4 text-sm text-gray-700 hover:bg-gray-50"
-                        >
-                          Excluir
-                        </button>
+                        {(ability.can("update", "Usuario") || ability.can("manage", "Permissao")) && (
+                          <button
+                            onClick={() => handleEditar(a)}
+                            className="w-full text-left px-5 py-4 text-sm text-gray-700 hover:bg-gray-50 border-b border-gray-100 last:border-b-0"
+                          >
+                            Editar
+                          </button>
+                        )}
+                        {ability.can("delete", "Usuario") && a.id !== session?.usuarioId && (
+                          <button
+                            onClick={() => handleConfirmarExcluir(a)}
+                            className="w-full text-left px-5 py-4 text-sm text-gray-700 hover:bg-gray-50"
+                          >
+                            Excluir
+                          </button>
+                        )}
                       </div>
                     )}
                   </td>
@@ -252,10 +279,10 @@ export default function AtendentesClient() {
         </table>
       </div>
 
-      <AtendenteModal
+      <UsuarioModal
         aberto={modalAberto}
         onFechar={() => setModalAberto(false)}
-        atendente={atendenteSelecionado}
+        usuario={usuarioSelecionado}
         onSalvar={handleSalvar}
       />
 
@@ -273,11 +300,11 @@ export default function AtendentesClient() {
                 <span className="text-red-500 text-xl font-bold">!</span>
               </div>
               <h2 className="text-lg font-bold text-gray-900 mb-2">
-                Deseja excluir o Atendente?
+                Deseja excluir o Usuário?
               </h2>
               <p className="text-sm text-gray-500">
-                Você deseja mesmo excluir o Atendente{" "}
-                <strong className="text-gray-700">{atendenteDeletar?.nome}</strong>?
+                Você deseja mesmo excluir o Usuário{" "}
+                <strong className="text-gray-700">{usuarioDeletar?.nome}</strong>?
               </p>
             </div>
             <div className="border-t border-gray-100 px-6 py-4 flex justify-end">

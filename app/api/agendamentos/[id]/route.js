@@ -1,18 +1,24 @@
-import { auth } from "@/auth";
+import { subject } from "@casl/ability";
 import { prisma } from "@/lib/prisma";
-import { criarEvento, atualizarEvento, apagarEvento, getAtendenteComTokens } from "@/lib/googleCalendar";
+import { autenticar, semPermissao, naoEncontrado } from "@/lib/autorizacao";
+import { criarEvento, atualizarEvento, apagarEvento, getUsuarioComTokens } from "@/lib/googleCalendar";
 
 export async function PUT(request, { params }) {
-  const session = await auth();
-  if (!session?.user) {
-    return Response.json({ error: "Não autorizado" }, { status: 401 });
-  }
+  const { ability, erro } = await autenticar();
+  if (erro) return erro;
 
   const { id } = await params;
   const { dataHoraInicio, dataHoraFim, cliente, linkUmbler, observacoes, alertaMinutos, atendenteId, statusId, assuntoIds } =
     await request.json();
 
   const anterior = await prisma.agendamento.findUnique({ where: { id } });
+  if (!anterior) return naoEncontrado();
+  if (
+    ability.cannot("update", subject("Agendamento", anterior)) ||
+    ability.cannot("update", subject("Agendamento", { ...anterior, atendenteId }))
+  ) {
+    return semPermissao();
+  }
 
   const agendamento = await prisma.agendamento.update({
     where: { id },
@@ -27,14 +33,13 @@ export async function PUT(request, { params }) {
       statusId,
       assuntos: { set: assuntoIds.map((id) => ({ id })) },
     },
-    include: { atendente: true },
   });
 
-  const trocouAtendente = anterior && anterior.atendenteId !== agendamento.atendenteId;
-  const atendenteComTokens = await getAtendenteComTokens(agendamento.atendenteId);
+  const trocouAtendente = anterior.atendenteId !== agendamento.atendenteId;
+  const atendenteComTokens = await getUsuarioComTokens(agendamento.atendenteId);
 
   if (trocouAtendente) {
-    const atendenteAnteriorComTokens = await getAtendenteComTokens(anterior.atendenteId);
+    const atendenteAnteriorComTokens = await getUsuarioComTokens(anterior.atendenteId);
     await apagarEvento(atendenteAnteriorComTokens, anterior.googleEventId);
     const googleEventId = await criarEvento(atendenteComTokens, agendamento);
     await prisma.agendamento.update({ where: { id }, data: { googleEventId } });
@@ -51,19 +56,19 @@ export async function PUT(request, { params }) {
 }
 
 export async function DELETE(_, { params }) {
-  const session = await auth();
-  if (!session?.user) {
-    return Response.json({ error: "Não autorizado" }, { status: 401 });
-  }
+  const { ability, erro } = await autenticar();
+  if (erro) return erro;
 
   const { id } = await params;
 
   const agendamento = await prisma.agendamento.findUnique({ where: { id } });
-
-  if (agendamento) {
-    const atendenteComTokens = await getAtendenteComTokens(agendamento.atendenteId);
-    await apagarEvento(atendenteComTokens, agendamento.googleEventId);
+  if (!agendamento) return naoEncontrado();
+  if (ability.cannot("delete", subject("Agendamento", agendamento))) {
+    return semPermissao();
   }
+
+  const atendenteComTokens = await getUsuarioComTokens(agendamento.atendenteId);
+  await apagarEvento(atendenteComTokens, agendamento.googleEventId);
 
   await prisma.agendamento.delete({ where: { id } });
 

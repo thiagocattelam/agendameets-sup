@@ -1,11 +1,10 @@
-import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { autenticar, semPermissao } from "@/lib/autorizacao";
 
 export async function GET() {
-  const session = await auth();
-  if (!session?.user) {
-    return Response.json({ error: "Não autorizado" }, { status: 401 });
-  }
+  const { ability, erro } = await autenticar();
+  if (erro) return erro;
+  if (ability.cannot("read", "Assunto")) return semPermissao();
 
   const assuntos = await prisma.assunto.findMany({
     orderBy: { descricao: "asc" },
@@ -14,10 +13,9 @@ export async function GET() {
 }
 
 export async function POST(request) {
-  const session = await auth();
-  if (!session?.user) {
-    return Response.json({ error: "Não autorizado" }, { status: 401 });
-  }
+  const { ability, erro } = await autenticar();
+  if (erro) return erro;
+  if (ability.cannot("create", "Assunto")) return semPermissao();
 
   const { descricao } = await request.json();
 

@@ -61,7 +61,7 @@ export function useAlertaAgendamentos({ onAlertar }) {
   );
 
   const buscarAgendamentos = useCallback(async () => {
-    const atendenteId = session?.atendenteId;
+    const atendenteId = session?.usuarioId;
     if (!atendenteId) return;
 
     const hoje = new Date();
@@ -83,7 +83,7 @@ export function useAlertaAgendamentos({ onAlertar }) {
     } catch {
       // silencia erros de rede
     }
-  }, [session?.atendenteId, agendarTimers]);
+  }, [session?.usuarioId, agendarTimers]);
 
   useEffect(() => {
     buscarAgendamentos();

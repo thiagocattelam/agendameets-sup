@@ -14,7 +14,7 @@ export async function GET(request) {
 
   const session = await auth();
 
-  if (!code || !state || state !== savedState || !session?.atendenteId) {
+  if (!code || !state || state !== savedState || !session?.usuarioId) {
     return Response.redirect(new URL("/", request.url));
   }
 
@@ -37,8 +37,8 @@ export async function GET(request) {
     tokenExpiry: tokens.expiry_date ? new Date(tokens.expiry_date) : null,
   };
 
-  await prisma.atendente.update({
-    where: { id: session.atendenteId },
+  await prisma.usuario.update({
+    where: { id: session.usuarioId },
     data: {
       googleCalendarConectado: true,
       googleCredencial: {

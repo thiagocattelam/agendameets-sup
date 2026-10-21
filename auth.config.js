@@ -1,4 +1,5 @@
 import Google from "next-auth/providers/google";
+import { criarAbility, podeAcessarRota } from "@/lib/permissoes";
 
 export const authConfig = {
   providers: [Google],
@@ -7,8 +8,18 @@ export const authConfig = {
     error: "/login",
   },
   callbacks: {
-    authorized({ auth }) {
-      return !!auth?.user;
+    authorized({ auth, request }) {
+      if (!auth?.user) return false;
+      if (!podeAcessarRota(criarAbility(auth.regras), request.nextUrl.pathname)) {
+        return Response.redirect(new URL("/", request.nextUrl));
+      }
+      return true;
+    },
+    session({ session, token }) {
+      session.usuarioId = token.usuarioId ?? null;
+      session.perfil = token.perfil ?? null;
+      session.regras = token.regras ?? [];
+      return session;
     },
   },
 };

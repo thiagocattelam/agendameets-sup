@@ -1,12 +1,13 @@
-import { auth } from "@/auth";
+import { subject } from "@casl/ability";
+import { accessibleBy } from "@casl/prisma";
 import { prisma } from "@/lib/prisma";
-import { criarEvento, getAtendenteComTokens } from "@/lib/googleCalendar";
+import { autenticar, semPermissao } from "@/lib/autorizacao";
+import { selectAgendamento } from "@/lib/camposPublicos";
+import { criarEvento, getUsuarioComTokens } from "@/lib/googleCalendar";
 
 export async function GET(request) {
-  const session = await auth();
-  if (!session?.user) {
-    return Response.json({ error: "Não autorizado" }, { status: 401 });
-  }
+  const { ability, erro } = await autenticar();
+  if (erro) return erro;
 
   const { searchParams } = new URL(request.url);
   const inicio = searchParams.get("inicio");
@@ -15,7 +16,7 @@ export async function GET(request) {
   const page = Math.max(1, parseInt(searchParams.get("page") ?? "1", 10));
   const pageSize = Math.max(1, parseInt(searchParams.get("pageSize") ?? "15", 10));
 
-  const where = {};
+  const where = { AND: [accessibleBy(ability, "read").ofType("Agendamento")] };
 
   if (inicio && fim) {
     where.dataHoraInicio = {
@@ -31,11 +32,7 @@ export async function GET(request) {
   const [data, total] = await Promise.all([
     prisma.agendamento.findMany({
       where,
-      include: {
-        atendente: true,
-        assuntos: true,
-        status: true,
-      },
+      select: selectAgendamento,
       orderBy: { dataHoraInicio: "asc" },
       skip: (page - 1) * pageSize,
       take: pageSize,
@@ -47,13 +44,15 @@ export async function GET(request) {
 }
 
 export async function POST(request) {
-  const session = await auth();
-  if (!session?.user) {
-    return Response.json({ error: "Não autorizado" }, { status: 401 });
-  }
+  const { ability, erro } = await autenticar();
+  if (erro) return erro;
 
   const { dataHoraInicio, dataHoraFim, cliente, linkUmbler, observacoes, alertaMinutos, atendenteId, statusId, assuntoIds } =
     await request.json();
+
+  if (ability.cannot("create", subject("Agendamento", { atendenteId }))) {
+    return semPermissao();
+  }
 
   const agendamento = await prisma.agendamento.create({
     data: {
@@ -67,10 +66,9 @@ export async function POST(request) {
       statusId,
       assuntos: { connect: assuntoIds.map((id) => ({ id })) },
     },
-    include: { atendente: true },
   });
 
-  const atendenteComTokens = await getAtendenteComTokens(agendamento.atendenteId);
+  const atendenteComTokens = await getUsuarioComTokens(agendamento.atendenteId);
   const googleEventId = await criarEvento(atendenteComTokens, agendamento);
   if (googleEventId) {
     await prisma.agendamento.update({ where: { id: agendamento.id }, data: { googleEventId } });

@@ -1,6 +1,7 @@
 import NextAuth from "next-auth";
 import { prisma } from "@/lib/prisma";
 import { authConfig } from "@/auth.config";
+import { montarRegras } from "@/lib/permissoes";
 
 function dominioPermitido(email) {
   const dominioEmail = email?.split("@")[1]?.toLowerCase();
@@ -14,9 +15,17 @@ function dominioPermitido(email) {
   return dominios.includes(dominioEmail);
 }
 
+const selectAcesso = {
+  id: true,
+  ativo: true,
+  perfil: true,
+  permissoes: { select: { permissao: true, concedida: true } },
+};
+
 export const { handlers, signIn, signOut, auth } = NextAuth({
   ...authConfig,
   callbacks: {
+    ...authConfig.callbacks,
     async signIn({ profile }) {
       return dominioPermitido(profile?.email);
     },
@@ -26,21 +35,23 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         return null;
       }
 
-      const atendente = await prisma.atendente.findUnique({
-        where: { email },
-        select: { id: true, ativo: true },
-      });
+      const usuario = profile
+        ? await prisma.usuario.upsert({
+            where: { email },
+            update: {},
+            create: { nome: profile.name || email, email },
+            select: selectAcesso,
+          })
+        : await prisma.usuario.findUnique({ where: { email }, select: selectAcesso });
 
-      if (atendente && !atendente.ativo) {
+      if (!usuario?.ativo) {
         return null;
       }
 
-      token.atendenteId = atendente?.id ?? null;
+      token.usuarioId = usuario.id;
+      token.perfil = usuario.perfil;
+      token.regras = montarRegras(usuario);
       return token;
-    },
-    async session({ session, token }) {
-      session.atendenteId = token.atendenteId ?? null;
-      return session;
     },
   },
 });

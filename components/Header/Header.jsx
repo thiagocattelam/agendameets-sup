@@ -6,6 +6,8 @@ import { usePathname } from "next/navigation";
 import { Menu, X } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { useSession, signOut } from "next-auth/react";
+import { useAbility } from "@/hooks/useAbility";
+import { podeAcessarRota } from "@/lib/permissoes";
 
 function UserAvatar({ user, size }) {
   const [imgError, setImgError] = useState(false);
@@ -37,7 +39,7 @@ function UserAvatar({ user, size }) {
 const navLinks = [
   { href: "/", label: "Início", icon: Home },
   { href: "/agendamentos", label: "Agendamentos", icon: CalendarDays },
-  { href: "/atendentes", label: "Atendentes", icon: Users },
+  { href: "/usuarios", label: "Usuários", icon: Users },
   { href: "/assuntos", label: "Assuntos", icon: Tag },
 ];
 
@@ -62,11 +64,12 @@ export default function Header() {
 
   // Dados do usuário logado via NextAuth
   const { data: session } = useSession();
+  const ability = useAbility();
 
-  // Estado da conexão com o Google Agenda do atendente logado
+  // Estado da conexão com o Google Agenda do usuário logado
   const [googleConectado, setGoogleConectado] = useState(null);
 
-  // Mensagem de erro exibida ao tentar conectar sem um Atendente vinculado ao e-mail logado
+  // Mensagem de erro exibida ao tentar conectar sem um Usuário vinculado ao e-mail logado
   const [erroConexao, setErroConexao] = useState(null);
 
   // Fecha a sidebar ao clicar fora dela
@@ -95,12 +98,12 @@ export default function Header() {
 
   // Busca o status da conexão com o Google Agenda ao abrir o popover
   useEffect(() => {
-    if (!popoverAberto || !session?.atendenteId) return;
+    if (!popoverAberto || !session?.usuarioId) return;
     fetch("/api/google-calendar/status")
       .then((res) => res.json())
       .then((data) => setGoogleConectado(data.conectado))
       .catch(() => {});
-  }, [popoverAberto, session?.atendenteId]);
+  }, [popoverAberto, session?.usuarioId]);
 
   // Avisa se a tentativa de conexão com o Google Agenda falhou
   useEffect(() => {
@@ -111,8 +114,8 @@ export default function Header() {
 
     if (erro === "email_mismatch") {
       setErroConexao("Conecte com a mesma conta Google usada no login para poder sincronizar sua agenda.");
-    } else if (erro === "sem_atendente") {
-      setErroConexao(`Nenhum cadastro de atendente com o e-mail ${session.user.email} informado.`);
+    } else if (erro === "sem_usuario") {
+      setErroConexao(`Nenhum cadastro de usuário com o e-mail ${session.user.email} informado.`);
     }
 
     params.delete("googleCalendarErro");
@@ -121,8 +124,8 @@ export default function Header() {
   }, [session?.user]);
 
   function conectarGoogleAgenda() {
-    if (!session.atendenteId) {
-      setErroConexao(`Nenhum cadastro de atendente com o e-mail ${session.user.email} informado.`);
+    if (!session.usuarioId) {
+      setErroConexao(`Nenhum cadastro de usuário com o e-mail ${session.user.email} informado.`);
       return;
     }
     window.location.href = "/api/google-calendar/connect";
@@ -154,7 +157,7 @@ export default function Header() {
 
       {/* Links de navegação */}
       <nav className="flex flex-col gap-1 px-3 py-3 flex-1">
-        {navLinks.map(({ href, label, icon: Icon }) => {
+        {navLinks.filter(({ href }) => podeAcessarRota(ability, href)).map(({ href, label, icon: Icon }) => {
           const active = currentPath === href;
           return (
             <Link
