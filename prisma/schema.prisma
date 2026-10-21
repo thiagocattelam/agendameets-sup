@@ -58,10 +58,11 @@ model Agendamento{
   dataHoraInicio DateTime
   dataHoraFim DateTime
   cliente String
-  linkUmbler String?
+  linkChat String?
   observacoes String?
   alertaMinutos Int?
   googleEventId String?
+  linkMeet String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
