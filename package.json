@@ -30,12 +30,17 @@
   "scripts": {
     "dev": "next dev",
     "build": "prisma generate && next build",
-    "start": "next start"
+    "start": "next start",
+    "db:deploy": "prisma migrate deploy",
+    "db:status": "prisma migrate status",
+    "db:deploy:prod": "dotenv -e .env.production -- prisma migrate deploy",
+    "db:status:prod": "dotenv -e .env.production -- prisma migrate status"
   },
   "author": "",
   "license": "MIT",
   "devDependencies": {
     "dotenv": "^17.4.2",
+    "dotenv-cli": "^11.0.0",
     "prisma": "^6.19.3"
   }
 }
