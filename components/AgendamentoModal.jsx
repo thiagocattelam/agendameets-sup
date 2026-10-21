@@ -1,8 +1,11 @@
 "use client";
 import { useState, useEffect, useRef, forwardRef } from "react";
 import { useSession } from "next-auth/react";
+import { subject } from "@casl/ability";
+import { useAbility } from "@/hooks/useAbility";
 import {
   X,
+  AlertCircle,
   ChevronDown,
   CalendarDays,
   Clock,
@@ -53,6 +56,18 @@ const emptyForm = {
   statusId: "",
   assuntoIds: [],
 };
+
+const MENSAGENS_ERRO = {
+  401: "Sua sessão expirou. Faça login novamente para salvar.",
+  403: "Você não tem permissão para salvar este agendamento com esse atendente.",
+  404: "Este agendamento não existe mais. Ele pode ter sido excluído por outra pessoa.",
+};
+
+async function mensagemDeErro(res) {
+  if (MENSAGENS_ERRO[res.status]) return MENSAGENS_ERRO[res.status];
+  const data = await res.json().catch(() => null);
+  return data?.error ?? "Não foi possível salvar o agendamento. Tente novamente.";
+}
 
 const TimeInput = forwardRef(
   ({ isOpen, hasError, displayValue, onTimeChange, onToggle }, ref) => {
@@ -186,11 +201,13 @@ export default function AgendamentoModal({
   assuntosList,
 }) {
   const { data: session } = useSession();
+  const ability = useAbility();
   const [form, setForm] = useState(emptyForm);
   const formInicialRef = useRef(emptyForm);
 
   const [tentouSalvar, setTentouSalvar] = useState(false);
   const [salvando, setSalvando] = useState(false);
+  const [erroSalvar, setErroSalvar] = useState(null);
   const [dataPickerAberto, setDataPickerAberto] = useState(false);
   const [horaInicioAberto, setHoraInicioAberto] = useState(false);
   const [horaFimAberto, setHoraFimAberto] = useState(false);
@@ -251,7 +268,7 @@ export default function AgendamentoModal({
     } else {
       initialForm = {
         ...emptyForm,
-        atendenteId: session?.atendenteId ?? "",
+        atendenteId: session?.usuarioId ?? "",
         statusId:
           statusList?.find((s) => s.descricao.toLowerCase() === "confirmado")
             ?.id ?? "",
@@ -259,7 +276,8 @@ export default function AgendamentoModal({
     }
     setForm(initialForm);
     formInicialRef.current = initialForm;
-  }, [agendamento, aberto, session?.atendenteId, statusList]);
+    setErroSalvar(null);
+  }, [agendamento, aberto, session?.usuarioId, statusList]);
 
   function pedirFechamento() {
     const isDirty = JSON.stringify(form) !== JSON.stringify(formInicialRef.current);
@@ -306,6 +324,7 @@ export default function AgendamentoModal({
       return;
     if (salvando) return;
     setSalvando(true);
+    setErroSalvar(null);
     try {
       const body = {
         dataHoraInicio: new Date(
@@ -327,14 +346,21 @@ export default function AgendamentoModal({
         : "/api/agendamentos";
       const method = agendamento ? "PUT" : "POST";
 
-      await fetch(url, {
+      const res = await fetch(url, {
         method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
 
+      if (!res.ok) {
+        setErroSalvar(await mensagemDeErro(res));
+        return;
+      }
+
       onSalvar();
       fechar();
+    } catch {
+      setErroSalvar("Não foi possível conectar ao servidor. Verifique sua conexão e tente novamente.");
     } finally {
       setSalvando(false);
     }
@@ -619,6 +645,12 @@ export default function AgendamentoModal({
                     <div className="absolute left-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg z-20 w-full max-h-48 overflow-y-auto">
                       {atendentes
                         ?.filter((a) => a.ativo)
+                        .filter((a) =>
+                          ability.can(
+                            agendamento ? "update" : "create",
+                            subject("Agendamento", { ...agendamento, atendenteId: a.id }),
+                          ),
+                        )
                         .map((a) => (
                           <button
                             key={a.id}
@@ -811,7 +843,13 @@ export default function AgendamentoModal({
             </div>
           </div>
 
-          <div className="border-t border-gray-100 px-6 py-4 flex justify-end items-center flex-shrink-0">
+          <div className="border-t border-gray-100 px-6 py-4 flex justify-end items-center gap-3 flex-shrink-0">
+            {erroSalvar && (
+              <p className="flex items-start gap-2 text-sm text-red-600 mr-auto">
+                <AlertCircle size={16} className="shrink-0 mt-0.5" />
+                {erroSalvar}
+              </p>
+            )}
             <button
               type="submit"
               disabled={salvando}

@@ -1,11 +1,10 @@
-import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { autenticar, semPermissao } from "@/lib/autorizacao";
 
 export async function PUT(request, { params }) {
-  const session = await auth();
-  if (!session?.user) {
-    return Response.json({ error: "Não autorizado" }, { status: 401 });
-  }
+  const { ability, erro } = await autenticar();
+  if (erro) return erro;
+  if (ability.cannot("update", "Assunto")) return semPermissao();
 
   const { id } = await params;
   const { descricao } = await request.json();
@@ -18,10 +17,9 @@ export async function PUT(request, { params }) {
 }
 
 export async function DELETE(_, { params }) {
-  const session = await auth();
-  if (!session?.user) {
-    return Response.json({ error: "Não autorizado" }, { status: 401 });
-  }
+  const { ability, erro } = await autenticar();
+  if (erro) return erro;
+  if (ability.cannot("delete", "Assunto")) return semPermissao();
 
   const { id } = await params;
 

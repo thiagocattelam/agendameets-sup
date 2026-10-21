@@ -3,8 +3,10 @@ import { useState, useEffect, useRef } from 'react';
 import { MessageSquare, X } from 'lucide-react';
 import AssuntoModal from '../../../components/AssuntoModal';
 import Skeleton from '../../../components/Skeleton';
+import { useAbility } from '@/hooks/useAbility';
 
 export default function AssuntosClient() {
+  const ability = useAbility();
   const [assuntos, setAssuntos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [modalAberto, setModalAberto] = useState(false);
@@ -79,13 +81,15 @@ export default function AssuntosClient() {
             )}
           </p>
         </div>
-        <button
-          onClick={handleAdicionar}
-          className="text-white px-4 py-2 rounded-xl text-sm font-medium transition hover:opacity-90"
-          style={{ backgroundColor: '#8b47ff' }}
-        >
-          + Adicionar
-        </button>
+        {ability.can('create', 'Assunto') && (
+          <button
+            onClick={handleAdicionar}
+            className="text-white px-4 py-2 rounded-xl text-sm font-medium transition hover:opacity-90"
+            style={{ backgroundColor: '#8b47ff' }}
+          >
+            + Adicionar
+          </button>
+        )}
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-gray-200">
@@ -152,18 +156,22 @@ export default function AssuntosClient() {
                         ref={menuRef}
                         className="absolute right-6 top-10 bg-white border border-gray-200 rounded-lg shadow-lg z-10 min-w-36 overflow-hidden"
                       >
-                        <button
-                          onClick={() => handleEditar(a)}
-                          className="w-full text-left px-5 py-4 text-sm text-gray-700 hover:bg-gray-50 border-b border-gray-100"
-                        >
-                          Editar
-                        </button>
-                        <button
-                          onClick={() => handleConfirmarExcluir(a)}
-                          className="w-full text-left px-5 py-4 text-sm text-gray-700 hover:bg-gray-50"
-                        >
-                          Excluir
-                        </button>
+                        {ability.can('update', 'Assunto') && (
+                          <button
+                            onClick={() => handleEditar(a)}
+                            className="w-full text-left px-5 py-4 text-sm text-gray-700 hover:bg-gray-50 border-b border-gray-100 last:border-b-0"
+                          >
+                            Editar
+                          </button>
+                        )}
+                        {ability.can('delete', 'Assunto') && (
+                          <button
+                            onClick={() => handleConfirmarExcluir(a)}
+                            className="w-full text-left px-5 py-4 text-sm text-gray-700 hover:bg-gray-50"
+                          >
+                            Excluir
+                          </button>
+                        )}
                       </div>
                     )}
                   </td>

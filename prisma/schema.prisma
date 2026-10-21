@@ -14,7 +14,12 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model Atendente{
+enum Perfil {
+  GESTAO
+  ATENDENTE
+}
+
+model Usuario{
   id String @id @default(cuid())
   nome String
   ativo Boolean @default(true)
@@ -23,8 +28,20 @@ model Atendente{
   createdAt DateTime @default(now())
   agendamentos Agendamento[]
 
+  perfil Perfil @default(ATENDENTE)
+  permissoes UsuarioPermissao[]
+
   googleCalendarConectado Boolean @default(false)
   googleCredencial GoogleCredencial?
+}
+
+model UsuarioPermissao{
+  usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  usuarioId String
+  permissao String
+  concedida Boolean @default(true)
+
+  @@id([usuarioId, permissao])
 }
 
 model GoogleCredencial{
@@ -33,8 +50,8 @@ model GoogleCredencial{
   refreshToken String?
   tokenExpiry DateTime?
 
-  atendente Atendente @relation(fields: [atendenteId], references: [id], onDelete: Cascade)
-  atendenteId String @unique
+  usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+  usuarioId String @unique
 }
 model Agendamento{
   id String @id @default(cuid())
@@ -48,7 +65,7 @@ model Agendamento{
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  atendente Atendente @relation(fields: [atendenteId], references: [id])
+  atendente Usuario @relation(fields: [atendenteId], references: [id])
   atendenteId String
 
   assuntos Assunto[]

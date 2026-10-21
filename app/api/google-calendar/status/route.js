@@ -3,14 +3,14 @@ import { prisma } from "@/lib/prisma";
 
 export async function GET() {
   const session = await auth();
-  if (!session?.atendenteId) {
+  if (!session?.usuarioId) {
     return Response.json({ conectado: false });
   }
 
-  const atendente = await prisma.atendente.findUnique({
-    where: { id: session.atendenteId },
+  const usuario = await prisma.usuario.findUnique({
+    where: { id: session.usuarioId },
     select: { googleCalendarConectado: true },
   });
 
-  return Response.json({ conectado: atendente?.googleCalendarConectado ?? false });
+  return Response.json({ conectado: usuario?.googleCalendarConectado ?? false });
 }

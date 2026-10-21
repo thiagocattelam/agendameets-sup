@@ -1,12 +1,20 @@
 "use client";
 import { useState, useEffect, useRef, forwardRef } from "react";
-import { ExternalLink, X, CalendarDays, ChevronDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, NotebookPen } from "lucide-react";
+import { ExternalLink, X, AlertCircle, CalendarDays, ChevronDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, NotebookPen } from "lucide-react";
+import { subject } from "@casl/ability";
 import AgendamentoModal from "../../../components/AgendamentoModal";
+import { useAbility } from "@/hooks/useAbility";
 import Skeleton from "../../../components/Skeleton";
 import DatePicker, { registerLocale } from "react-datepicker";
 import { ptBR } from "date-fns/locale/pt-BR";
 
 registerLocale("pt-BR", ptBR);
+
+const MENSAGENS_ERRO_EXCLUIR = {
+  401: "Sua sessão expirou. Faça login novamente para excluir.",
+  403: "Você não tem permissão para excluir este agendamento.",
+  404: "Este agendamento já foi excluído. A lista foi atualizada.",
+};
 
 function formatDateDisplay(dateStr) {
   if (!dateStr) return "—";
@@ -125,6 +133,7 @@ function SkeletonAgendamentosList() {
 }
 
 export default function AgendamentosClient() {
+  const ability = useAbility();
   const [dateRange, setDateRange] = useState([
     new Date(getMondayOf(new Date()) + "T12:00:00"),
     new Date(addDays(getMondayOf(new Date()), 6) + "T12:00:00"),
@@ -161,6 +170,8 @@ export default function AgendamentosClient() {
   const [agendamentoSelecionado, setAgendamentoSelecionado] = useState(null);
   const [modalDeleteAberto, setModalDeleteAberto] = useState(false);
   const [agendamentoDeletar, setAgendamentoDeletar] = useState(null);
+  const [excluindo, setExcluindo] = useState(false);
+  const [erroExcluir, setErroExcluir] = useState(null);
   const [menuAberto, setMenuAberto] = useState(null);
   const menuRef = useRef(null);
   const dateButtonRef = useRef(null);
@@ -169,7 +180,7 @@ export default function AgendamentosClient() {
 
   useEffect(() => {
     Promise.all([
-      fetch("/api/atendentes").then((r) => r.json()),
+      fetch("/api/usuarios").then((r) => r.json()),
       fetch("/api/status").then((r) => r.json()),
       fetch("/api/assuntos").then((r) => r.json()),
     ]).then(([at, st, as]) => {
@@ -240,13 +251,33 @@ export default function AgendamentosClient() {
     setMenuAberto(null);
   }
 
-  async function handleExcluir() {
-    await fetch(`/api/agendamentos/${agendamentoDeletar.id}`, {
-      method: "DELETE",
-    });
+  function fecharModalExcluir() {
     setModalDeleteAberto(false);
     setAgendamentoDeletar(null);
-    carregarAgendamentos();
+    setErroExcluir(null);
+  }
+
+  async function handleExcluir() {
+    if (excluindo) return;
+    setExcluindo(true);
+    setErroExcluir(null);
+    try {
+      const res = await fetch(`/api/agendamentos/${agendamentoDeletar.id}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        setErroExcluir(MENSAGENS_ERRO_EXCLUIR[res.status] ?? data?.error ?? "Não foi possível excluir o agendamento. Tente novamente.");
+        if (res.status === 404) carregarAgendamentos();
+        return;
+      }
+      fecharModalExcluir();
+      carregarAgendamentos();
+    } catch {
+      setErroExcluir("Não foi possível conectar ao servidor. Verifique sua conexão e tente novamente.");
+    } finally {
+      setExcluindo(false);
+    }
   }
 
   const totalPaginas = Math.ceil(totalAgendamentos / PAGE_SIZE);
@@ -301,13 +332,15 @@ export default function AgendamentosClient() {
               </div>
             )}
           </div>
-          <button
-            onClick={handleAdicionar}
-            className="text-white px-4 py-2 rounded-xl text-sm font-medium transition hover:opacity-90 whitespace-nowrap"
-            style={{ backgroundColor: "#8b47ff" }}
-          >
-            + Adicionar
-          </button>
+          {ability.can("create", "Agendamento") && (
+            <button
+              onClick={handleAdicionar}
+              className="text-white px-4 py-2 rounded-xl text-sm font-medium transition hover:opacity-90 whitespace-nowrap"
+              style={{ backgroundColor: "#8b47ff" }}
+            >
+              + Adicionar
+            </button>
+          )}
         </div>
       </div>
 
@@ -443,11 +476,14 @@ export default function AgendamentosClient() {
                   {label}
                 </h3>
                 <div className="flex flex-col gap-3">
-                  {items.map((ag) => (
+                  {items.map((ag) => {
+                    const podeEditar = ability.can("update", subject("Agendamento", ag));
+                    const podeExcluir = ability.can("delete", subject("Agendamento", ag));
+                    return (
                     <div
                       key={ag.id}
-                      onClick={() => handleEditar(ag)}
-                      className="bg-white border border-gray-200 rounded-xl shadow-sm flex flex-col gap-1.5 px-5 py-4 relative cursor-pointer hover:shadow-md transition-shadow"
+                      onClick={podeEditar ? () => handleEditar(ag) : undefined}
+                      className={`bg-white border border-gray-200 rounded-xl shadow-sm flex flex-col gap-1.5 px-5 py-4 relative ${podeEditar ? "cursor-pointer hover:shadow-md transition-shadow" : ""}`}
                       style={{
                         borderLeftWidth: "4px",
                         borderLeftColor: ag.status?.corHex ?? "#e5e7eb",
@@ -475,15 +511,17 @@ export default function AgendamentosClient() {
                               {ag.status.descricao}
                             </span>
                           )}
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setMenuAberto(menuAberto === ag.id ? null : ag.id);
-                            }}
-                            className="text-gray-400 hover:text-gray-700 p-1 rounded transition-colors font-bold text-lg leading-none"
-                          >
-                            ⋮
-                          </button>
+                          {(podeEditar || podeExcluir) && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setMenuAberto(menuAberto === ag.id ? null : ag.id);
+                              }}
+                              className="text-gray-400 hover:text-gray-700 p-1 rounded transition-colors font-bold text-lg leading-none"
+                            >
+                              ⋮
+                            </button>
+                          )}
                         </div>
                       </div>
 
@@ -535,28 +573,33 @@ export default function AgendamentosClient() {
                           ref={menuRef}
                           className="absolute right-4 top-10 bg-white border border-gray-200 rounded-lg shadow-lg z-10 min-w-36 overflow-hidden"
                         >
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleEditar(ag);
-                            }}
-                            className="w-full text-left px-5 py-4 text-sm text-gray-700 hover:bg-gray-50 border-b border-gray-100"
-                          >
-                            Editar
-                          </button>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleConfirmarExcluir(ag);
-                            }}
-                            className="w-full text-left px-5 py-4 text-sm text-gray-700 hover:bg-gray-50"
-                          >
-                            Excluir
-                          </button>
+                          {podeEditar && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleEditar(ag);
+                              }}
+                              className="w-full text-left px-5 py-4 text-sm text-gray-700 hover:bg-gray-50 border-b border-gray-100 last:border-b-0"
+                            >
+                              Editar
+                            </button>
+                          )}
+                          {podeExcluir && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleConfirmarExcluir(ag);
+                              }}
+                              className="w-full text-left px-5 py-4 text-sm text-gray-700 hover:bg-gray-50"
+                            >
+                              Excluir
+                            </button>
+                          )}
                         </div>
                       )}
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             );
@@ -629,7 +672,7 @@ export default function AgendamentosClient() {
           <div className="bg-white rounded-2xl w-full max-w-sm shadow-xl overflow-hidden">
             <div className="px-6 pt-6 pb-4 relative">
               <button
-                onClick={() => setModalDeleteAberto(false)}
+                onClick={fecharModalExcluir}
                 className="absolute top-4 right-4 text-gray-400 hover:text-gray-700 transition-colors"
               >
                 <X size={18} />
@@ -648,12 +691,19 @@ export default function AgendamentosClient() {
                 ?
               </p>
             </div>
+            {erroExcluir && (
+              <p className="flex items-start gap-2 text-sm text-red-600 px-6 pb-4">
+                <AlertCircle size={16} className="shrink-0 mt-0.5" />
+                {erroExcluir}
+              </p>
+            )}
             <div className="border-t border-gray-100 px-6 py-4 flex justify-end">
               <button
                 onClick={handleExcluir}
-                className="px-5 py-2.5 rounded-xl bg-red-500 hover:bg-red-600 text-white text-sm font-semibold transition"
+                disabled={excluindo}
+                className="px-5 py-2.5 rounded-xl bg-red-500 hover:bg-red-600 text-white text-sm font-semibold transition disabled:opacity-60"
               >
-                Sim, excluir
+                {excluindo ? "Excluindo..." : "Sim, excluir"}
               </button>
             </div>
           </div>
