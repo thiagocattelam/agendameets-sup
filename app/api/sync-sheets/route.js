@@ -27,9 +27,9 @@ export async function POST() {
     let criados = 0, ignorados = 0;
 
     for (const row of rows) {
-      const [dataStr, , horaInicio, horaFim, nomeAtendente, cliente, nomeAssunto, linkUmbler, nomeStatus, observacoes] = row;
+      const [dataStr, , horaInicio, horaFim, nomeAtendente, cliente, nomeAssunto, linkChat, nomeStatus, observacoes] = row;
 
-      if (!linkUmbler?.startsWith("http")) {
+      if (!linkChat?.startsWith("http")) {
         ignorados++;
         continue;
       }
@@ -47,7 +47,7 @@ export async function POST() {
 
       const assuntosConnect = assuntos.map((a) => ({ id: a.id }));
 
-      const existing = await prisma.agendamento.findFirst({ where: { linkUmbler } });
+      const existing = await prisma.agendamento.findFirst({ where: { linkChat } });
 
       if (existing) {
         ignorados++;
@@ -55,7 +55,7 @@ export async function POST() {
       } else {
         const novoAgendamento = await prisma.agendamento.create({
           data: {
-            dataHoraInicio, dataHoraFim, cliente, linkUmbler, observacoes: observacoes ?? null,
+            dataHoraInicio, dataHoraFim, cliente, linkChat, observacoes: observacoes ?? null,
             atendenteId: atendente.id, statusId: status.id,
             assuntos: { connect: assuntosConnect },
           },

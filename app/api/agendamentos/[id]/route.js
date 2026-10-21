@@ -1,14 +1,14 @@
 import { subject } from "@casl/ability";
 import { prisma } from "@/lib/prisma";
 import { autenticar, semPermissao, naoEncontrado } from "@/lib/autorizacao";
-import { criarEvento, atualizarEvento, apagarEvento, getUsuarioComTokens } from "@/lib/googleCalendar";
+import { criarEvento, criarMeet, atualizarEvento, apagarEvento, getUsuarioComTokens } from "@/lib/googleCalendar";
 
 export async function PUT(request, { params }) {
   const { ability, erro } = await autenticar();
   if (erro) return erro;
 
   const { id } = await params;
-  const { dataHoraInicio, dataHoraFim, cliente, linkUmbler, observacoes, alertaMinutos, atendenteId, statusId, assuntoIds } =
+  const { dataHoraInicio, dataHoraFim, cliente, linkChat, observacoes, alertaMinutos, atendenteId, statusId, assuntoIds } =
     await request.json();
 
   const anterior = await prisma.agendamento.findUnique({ where: { id } });
@@ -26,7 +26,7 @@ export async function PUT(request, { params }) {
       dataHoraInicio: new Date(dataHoraInicio),
       dataHoraFim: new Date(dataHoraFim),
       cliente,
-      linkUmbler: linkUmbler || null,
+      linkChat: linkChat || null,
       observacoes: observacoes || null,
       alertaMinutos: alertaMinutos ?? null,
       atendenteId,
@@ -41,8 +41,9 @@ export async function PUT(request, { params }) {
   if (trocouAtendente) {
     const atendenteAnteriorComTokens = await getUsuarioComTokens(anterior.atendenteId);
     await apagarEvento(atendenteAnteriorComTokens, anterior.googleEventId);
-    const googleEventId = await criarEvento(atendenteComTokens, agendamento);
-    await prisma.agendamento.update({ where: { id }, data: { googleEventId } });
+    const meet = anterior.linkMeet ? await criarMeet(atendenteComTokens, { ...agendamento, googleEventId: null }) : null;
+    const googleEventId = meet?.googleEventId ?? (await criarEvento(atendenteComTokens, agendamento));
+    await prisma.agendamento.update({ where: { id }, data: { googleEventId, linkMeet: meet?.linkMeet ?? null } });
   } else if (agendamento.googleEventId) {
     await atualizarEvento(atendenteComTokens, agendamento);
   } else {

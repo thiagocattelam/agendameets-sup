@@ -47,7 +47,7 @@ export async function POST(request) {
   const { ability, erro } = await autenticar();
   if (erro) return erro;
 
-  const { dataHoraInicio, dataHoraFim, cliente, linkUmbler, observacoes, alertaMinutos, atendenteId, statusId, assuntoIds } =
+  const { dataHoraInicio, dataHoraFim, cliente, linkChat, observacoes, alertaMinutos, atendenteId, statusId, assuntoIds } =
     await request.json();
 
   if (ability.cannot("create", subject("Agendamento", { atendenteId }))) {
@@ -59,7 +59,7 @@ export async function POST(request) {
       dataHoraInicio: new Date(dataHoraInicio),
       dataHoraFim: new Date(dataHoraFim),
       cliente,
-      linkUmbler: linkUmbler || null,
+      linkChat: linkChat || null,
       observacoes: observacoes || null,
       alertaMinutos: alertaMinutos ?? null,
       atendenteId,
