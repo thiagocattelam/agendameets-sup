@@ -87,7 +87,7 @@ auth.config.js             # Edge-safe config: Google provider, session callback
 | `Usuario` | `nome`, `ativo`, `email?` (unique), `alertaMinutos?` (default 30), `perfil` (`GESTAO` \| `ATENDENTE`, default `ATENDENTE`), `googleCalendarConectado` |
 | `UsuarioPermissao` | PK (`usuarioId`, `permissao`), `concedida` — per-user grant (`true`) or block (`false`) |
 | `GoogleCredencial` | `accessToken`, `refreshToken`, `tokenExpiry`, 1:1 `usuarioId` (cascade) |
-| `Agendamento` | `dataHoraInicio`, `dataHoraFim`, `cliente`, `linkUmbler?`, `observacoes?`, `alertaMinutos?`, `googleEventId?`, FK `atendenteId` → Usuario, FK to Status, M2M to Assunto |
+| `Agendamento` | `dataHoraInicio`, `dataHoraFim`, `cliente`, `linkChat?`, `observacoes?`, `alertaMinutos?`, `googleEventId?`, FK `atendenteId` → Usuario, FK to Status, M2M to Assunto |
 | `Assunto` | `descricao`, M2M to Agendamento |
 | `Status` | `descricao`, `corHex` (hex color for badge display) |
 
@@ -130,7 +130,7 @@ Per-user opt-in OAuth flow in `lib/googleCalendar.js` (`getUsuarioComTokens`, `c
 
 ### Sheets sync
 
-`POST /api/sync-sheets` reads range `A7:J` from the configured Google Sheet, creates missing Usuario/Status/Assunto records on-the-fly, and upserts Agendamentos using `linkUmbler` as the deduplication key. Rows without a valid `http` linkUmbler are skipped. **Not yet adapted to permissions**: any logged-in user can run it, and users it creates have no email (can't log in). Planned to be revisited.
+`POST /api/sync-sheets` reads range `A7:J` from the configured Google Sheet, creates missing Usuario/Status/Assunto records on-the-fly, and upserts Agendamentos using `linkChat` as the deduplication key. Rows without a valid `http` linkChat are skipped. **Not yet adapted to permissions**: any logged-in user can run it, and users it creates have no email (can't log in). Planned to be revisited.
 
 ### External integrations
 
