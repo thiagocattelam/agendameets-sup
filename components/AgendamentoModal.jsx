@@ -49,7 +49,7 @@ const emptyForm = {
   horaInicio: "",
   horaFim: "",
   cliente: "",
-  linkUmbler: "",
+  linkChat: "",
   observacoes: "",
   alertaMinutos: "",
   atendenteId: "",
@@ -255,7 +255,7 @@ export default function AgendamentoModal({
         horaInicio: toLocalTime(agendamento.dataHoraInicio),
         horaFim: toLocalTime(agendamento.dataHoraFim),
         cliente: agendamento.cliente,
-        linkUmbler: agendamento.linkUmbler ?? "",
+        linkChat: agendamento.linkChat ?? "",
         observacoes: agendamento.observacoes ?? "",
         alertaMinutos:
           agendamento.alertaMinutos != null
@@ -317,7 +317,7 @@ export default function AgendamentoModal({
       !form.horaInicio ||
       !form.horaFim ||
       !form.cliente ||
-      !form.linkUmbler ||
+      !form.linkChat ||
       !form.atendenteId ||
       !form.statusId
     )
@@ -332,7 +332,7 @@ export default function AgendamentoModal({
         ).toISOString(),
         dataHoraFim: new Date(`${form.data}T${form.horaFim}:00`).toISOString(),
         cliente: form.cliente,
-        linkUmbler: form.linkUmbler || null,
+        linkChat: form.linkChat || null,
         observacoes: form.observacoes || null,
         alertaMinutos:
           form.alertaMinutos !== "" ? Number(form.alertaMinutos) : null,
@@ -805,20 +805,20 @@ export default function AgendamentoModal({
               </div>
             </div>
 
-            {/* Link Umbler */}
+            {/* Link Chat */}
             <div>
               <label className="text-xs font-medium text-gray-500 mb-1 block">
-                Link Umbler
+                Link Chat
               </label>
               <input
                 type="url"
-                value={form.linkUmbler}
+                value={form.linkChat}
                 onChange={(e) =>
-                  setForm({ ...form, linkUmbler: e.target.value })
+                  setForm({ ...form, linkChat: e.target.value })
                 }
                 placeholder="https://..."
                 className={`border rounded-lg px-3 py-2 text-sm w-full focus:outline-none focus:ring-2 focus:ring-purple-300 ${
-                  tentouSalvar && !form.linkUmbler
+                  tentouSalvar && !form.linkChat
                     ? "border-red-400 ring-2 ring-red-100"
                     : "border-gray-200"
                 }`}
