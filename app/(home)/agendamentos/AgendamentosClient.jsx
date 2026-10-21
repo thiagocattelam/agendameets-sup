@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect, useRef, forwardRef } from "react";
-import { ExternalLink, X, AlertCircle, CalendarDays, ChevronDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, NotebookPen } from "lucide-react";
+import { ExternalLink, X, AlertCircle, CalendarDays, ChevronDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, NotebookPen, Video, Copy, Check } from "lucide-react";
 import { subject } from "@casl/ability";
 import AgendamentoModal from "../../../components/AgendamentoModal";
 import { useAbility } from "@/hooks/useAbility";
@@ -102,6 +102,30 @@ function formatDataCabecalho(dateStr) {
   });
 }
 
+const FUSO_HORARIO = "America/Sao_Paulo";
+
+const CLASSE_ACAO =
+  "inline-flex items-center gap-1.5 h-8 px-2 rounded-lg text-[13px] text-gray-600 hover:bg-gray-100 hover:text-gray-800 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-300";
+
+function montarTextoConvite(ag) {
+  const data = new Date(ag.dataHoraInicio).toLocaleDateString("pt-BR", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    timeZone: FUSO_HORARIO,
+  });
+  const hora = (dateStr) =>
+    new Date(dateStr).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: FUSO_HORARIO });
+
+  return [
+    ag.cliente,
+    `${data.charAt(0).toUpperCase() + data.slice(1)} · ${hora(ag.dataHoraInicio)} – ${hora(ag.dataHoraFim)}`,
+    `Fuso horário: ${FUSO_HORARIO}`,
+    "Como participar do Google Meet",
+    `Link da videochamada: ${ag.linkMeet}`,
+  ].join("\n");
+}
+
 function SkeletonAgendamentoCard() {
   return (
     <div className="bg-white border border-gray-200 rounded-xl shadow-sm flex flex-col gap-2.5 px-5 py-4">
@@ -173,6 +197,9 @@ export default function AgendamentosClient() {
   const [excluindo, setExcluindo] = useState(false);
   const [erroExcluir, setErroExcluir] = useState(null);
   const [menuAberto, setMenuAberto] = useState(null);
+  const [criandoMeetId, setCriandoMeetId] = useState(null);
+  const [erroMeet, setErroMeet] = useState(null);
+  const [copiadoId, setCopiadoId] = useState(null);
   const menuRef = useRef(null);
   const dateButtonRef = useRef(null);
   const atendenteDropdownRef = useRef(null);
@@ -277,6 +304,35 @@ export default function AgendamentosClient() {
       setErroExcluir("Não foi possível conectar ao servidor. Verifique sua conexão e tente novamente.");
     } finally {
       setExcluindo(false);
+    }
+  }
+
+  async function handleCriarMeet(ag) {
+    if (criandoMeetId) return;
+    setCriandoMeetId(ag.id);
+    setErroMeet(null);
+    try {
+      const res = await fetch(`/api/agendamentos/${ag.id}/meet`, { method: "POST" });
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        setErroMeet({ id: ag.id, mensagem: data?.error ?? "Não foi possível criar a videoconferência. Tente novamente." });
+        return;
+      }
+      setAgendamentos((lista) => lista.map((a) => (a.id === ag.id ? { ...a, linkMeet: data.linkMeet } : a)));
+    } catch {
+      setErroMeet({ id: ag.id, mensagem: "Não foi possível conectar ao servidor. Verifique sua conexão e tente novamente." });
+    } finally {
+      setCriandoMeetId(null);
+    }
+  }
+
+  async function handleCopiarConvite(ag) {
+    try {
+      await navigator.clipboard.writeText(montarTextoConvite(ag));
+      setCopiadoId(ag.id);
+      setTimeout(() => setCopiadoId((id) => (id === ag.id ? null : id)), 2000);
+    } catch {
+      setErroMeet({ id: ag.id, mensagem: "Não foi possível copiar para a área de transferência." });
     }
   }
 
@@ -543,29 +599,89 @@ export default function AgendamentosClient() {
                         )}
                       </div>
 
-                      {/* Link Umbler + Observações */}
-                      <div className="flex items-center gap-3 mt-0.5">
-                        {ag.linkUmbler && (
-                          <a
-                            href={ag.linkUmbler}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="flex items-center gap-1 text-xs text-purple-500 hover:text-purple-700 hover:underline w-fit"
-                          >
-                            <ExternalLink size={11} />
-                            Abrir no Umbler
-                          </a>
-                        )}
-                        {ag.observacoes && (
-                          <div className="relative group w-fit">
-                            <NotebookPen size={13} className="text-gray-400 hover:text-gray-600 cursor-default transition-colors" />
-                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block z-20 w-64 bg-white border border-gray-200 text-gray-700 text-xs rounded-xl px-3 py-2.5 shadow-lg pointer-events-none whitespace-pre-wrap break-words">
-                              {ag.observacoes}
-                              <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-200" />
+                      {/* Ações: Chat, Google Meet, Observações */}
+                      {(ag.linkChat || ag.linkMeet || ag.observacoes || (podeEditar && ag.atendente.googleCalendarConectado)) && (
+                        <div className="flex flex-wrap items-center gap-1 mt-2 pt-2 -mx-2.5 px-0.5 border-t border-gray-100">
+                          {ag.linkChat && (
+                            <a
+                              href={ag.linkChat}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={(e) => e.stopPropagation()}
+                              className={CLASSE_ACAO}
+                            >
+                              <ExternalLink size={14} />
+                              Abrir no Chat
+                            </a>
+                          )}
+                          {ag.linkMeet ? (
+                            <>
+                              <a
+                                href={ag.linkMeet}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                onClick={(e) => e.stopPropagation()}
+                                title={ag.linkMeet}
+                                className={CLASSE_ACAO}
+                              >
+                                <Video size={14} />
+                                Entrar com o Google Meet
+                              </a>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleCopiarConvite(ag);
+                                }}
+                                aria-label="Copiar dados do agendamento"
+                                title="Copiar dados do agendamento"
+                                className={`${CLASSE_ACAO} min-w-8 justify-center`}
+                              >
+                                {copiadoId === ag.id ? <Check size={14} className="text-green-600" /> : <Copy size={14} />}
+                                {copiadoId === ag.id && <span className="text-green-600">Copiado!</span>}
+                              </button>
+                            </>
+                          ) : (
+                            podeEditar &&
+                            ag.atendente.googleCalendarConectado && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleCriarMeet(ag);
+                                }}
+                                disabled={criandoMeetId === ag.id}
+                                className={`${CLASSE_ACAO} disabled:opacity-60 disabled:cursor-wait`}
+                              >
+                                <Video size={14} />
+                                {criandoMeetId === ag.id ? "Criando videoconferência..." : "Criar videoconferência"}
+                              </button>
+                            )
+                          )}
+                          {ag.observacoes && (
+                            <div className="relative group w-fit">
+                              <span
+                                tabIndex={0}
+                                aria-label="Observações"
+                                onClick={(e) => e.stopPropagation()}
+                                className={`${CLASSE_ACAO} min-w-8 justify-center cursor-default`}
+                              >
+                                <NotebookPen size={14} />
+                              </span>
+                              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block group-focus-within:block z-20 w-64 bg-white border border-gray-200 text-gray-700 text-xs rounded-xl px-3 py-2.5 shadow-lg pointer-events-none whitespace-pre-wrap break-words">
+                                {ag.observacoes}
+                                <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-gray-200" />
+                              </div>
                             </div>
-                          </div>
-                        )}
-                      </div>
+                          )}
+                        </div>
+                      )}
+                      {erroMeet?.id === ag.id && (
+                        <p className="flex items-start gap-1.5 text-xs text-red-600">
+                          <AlertCircle size={13} className="shrink-0 mt-px" />
+                          {erroMeet.mensagem}
+                        </p>
+                      )}
 
                       {/* Dropdown menu */}
                       {menuAberto === ag.id && (
