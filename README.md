@@ -78,7 +78,7 @@ agendameets-sup/
 - **Usuario** — `nome`, `ativo`, `email` (único, vincula ao login Google), `alertaMinutos` (antecedência padrão do alerta), `perfil` (`GESTAO` ou `ATENDENTE`), `googleCalendarConectado`. É o usuário da sessão e também quem atende os agendamentos.
 - **UsuarioPermissao** — liberação pontual de um usuário: `permissao` (chave do catálogo) e `concedida` (`true` libera, `false` bloqueia).
 - **GoogleCredencial** — tokens OAuth da Google Agenda do usuário (1:1 com Usuario).
-- **Agendamento** — `dataHoraInicio`, `dataHoraFim`, `cliente`, `linkUmbler`, `observacoes`, `alertaMinutos` (sobrescreve o do usuário), `googleEventId` (evento na Google Agenda); `atendente`/`atendenteId` aponta para o Usuario que atende; FK para Status; M2M com Assunto.
+- **Agendamento** — `dataHoraInicio`, `dataHoraFim`, `cliente`, `linkChat`, `observacoes`, `alertaMinutos` (sobrescreve o do usuário), `googleEventId` (evento na Google Agenda); `atendente`/`atendenteId` aponta para o Usuario que atende; FK para Status; M2M com Assunto.
 - **Assunto** — categoria/tema da reunião (muitos para muitos com Agendamento).
 - **Status** — estado do agendamento com cor em hex para badge visual.
 
@@ -119,7 +119,7 @@ O hook `useAlertaAgendamentos` roda no cliente e faz polling a cada 60 segundos 
 
 ### Importação via Google Sheets
 
-`POST /api/sync-sheets` lê o intervalo `A7:J` da planilha configurada e importa agendamentos. Usuários, status e assuntos são criados automaticamente se não existirem. O campo `linkUmbler` é usado como chave de deduplicação; linhas sem ele são ignoradas.
+`POST /api/sync-sheets` lê o intervalo `A7:J` da planilha configurada e importa agendamentos. Usuários, status e assuntos são criados automaticamente se não existirem. O campo `linkChat` é usado como chave de deduplicação; linhas sem ele são ignoradas.
 
 > A importação ainda não foi adaptada ao modelo de permissões: qualquer usuário logado pode executá-la, e os usuários criados por ela não têm e-mail (não conseguem logar).
 
