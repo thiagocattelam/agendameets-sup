@@ -7,21 +7,23 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ```bash
 npm run dev               # Start Next.js dev server (port 3000)
 npm run build             # prisma generate + next build (does NOT apply migrations)
-npx prisma migrate deploy # Apply pending migrations — use this, never `migrate dev` (see below)
+npx prisma migrate dev --name <nome>  # Create + apply a migration locally (.env.development)
+npm run db:deploy         # Apply pending migrations (local); db:deploy:prod for production
+npm run db:status         # Migration status (local); db:status:prod for production
 npx prisma generate       # Regenerate Prisma client after schema changes
 npx prisma studio         # Open Prisma Studio to inspect the database
 ```
 
 No lint or test scripts configured.
 
-### Migrations — read before touching the schema
+### Migrations
 
-The migration history is **behind the real schema**: several columns (`email`, `alertaMinutos`, `googleEventId`, old Google token columns) were added without migrations. Consequences:
+History was squashed into a baseline `prisma/migrations/0_init` (matches the schema as of 2026-11; older migrations live only in git history). Standard Prisma flow:
 
-- `npx prisma migrate dev` may detect drift and propose a database reset. Don't use it.
-- Write new migrations as hand-written SQL in `prisma/migrations/<timestamp>_<name>/migration.sql` (`npx prisma migrate diff --from-schema-datamodel <old> --to-schema-datamodel prisma/schema.prisma --script` is a good starting point) and apply with `migrate deploy`.
-- Renames must be written as `ALTER ... RENAME` by hand — Prisma's diff turns a model/column rename into DROP + CREATE (data loss).
-- Migrations cannot build a fresh database; a new environment uses `prisma db push` + `migrate resolve --applied` for each migration.
+- Schema change → `npx prisma migrate dev --name <nome>` locally → commit the migration → `npm run db:deploy:prod`.
+- Never change the database with `db push` or manual SQL — that brings back drift between migrations and the database.
+- Review generated SQL before applying: Prisma turns a model/column rename into DROP + CREATE (data loss); use `--create-only` and rewrite it as `ALTER ... RENAME`.
+- A fresh database is built with `migrate deploy` alone.
 
 ## Architecture
 
