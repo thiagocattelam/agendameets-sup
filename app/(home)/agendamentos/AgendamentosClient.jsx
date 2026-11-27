@@ -1,6 +1,6 @@
 "use client";
 import { useState, useEffect, useRef, forwardRef } from "react";
-import { ExternalLink, X, AlertCircle, CalendarDays, ChevronDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, NotebookPen, Video, Copy, Check } from "lucide-react";
+import { ExternalLink, X, Search, AlertCircle, CalendarDays, ChevronDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, NotebookPen, Video, Copy, Check } from "lucide-react";
 import { subject } from "@casl/ability";
 import AgendamentoModal from "../../../components/AgendamentoModal";
 import { useAbility } from "@/hooks/useAbility";
@@ -9,6 +9,8 @@ import DatePicker, { registerLocale } from "react-datepicker";
 import { ptBR } from "date-fns/locale/pt-BR";
 
 registerLocale("pt-BR", ptBR);
+
+const BUSCA_DEBOUNCE_MS = 300;
 
 const MENSAGENS_ERRO_EXCLUIR = {
   401: "Sua sessão expirou. Faça login novamente para excluir.",
@@ -166,6 +168,14 @@ export default function AgendamentosClient() {
   const dataFim = dateRange[1] ? toDateKey(dateRange[1]) : null;
   const [atendenteId, setAtendenteId] = useState("");
   const [filtroCarregado, setFiltroCarregado] = useState(false);
+  const [busca, setBusca] = useState("");
+  const [buscaAplicada, setBuscaAplicada] = useState("");
+
+  // Espera o usuário parar de digitar antes de buscar
+  useEffect(() => {
+    const timer = setTimeout(() => setBuscaAplicada(busca.trim()), BUSCA_DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+  }, [busca]);
 
   function handleSetAtendenteId(id) {
     setAtendenteId(id);
@@ -221,7 +231,7 @@ export default function AgendamentosClient() {
     if (!filtroCarregado) return;
     setPagina(1);
     carregarAgendamentos(1);
-  }, [dataInicio, dataFim, atendenteId, filtroCarregado]);
+  }, [dataInicio, dataFim, atendenteId, buscaAplicada, filtroCarregado]);
 
   useEffect(() => {
     function handleClickFora(e) {
@@ -244,19 +254,36 @@ export default function AgendamentosClient() {
 
   const LOADING_DELAY_MS = 200;
 
+  const requisicaoRef = useRef(null);
+
   function carregarAgendamentos(page = pagina) {
     if (!dataInicio || !dataFim) return;
+    // Cancela a requisição anterior para uma resposta antiga não sobrescrever a atual
+    requisicaoRef.current?.abort();
+    const controller = new AbortController();
+    requisicaoRef.current = controller;
+
     const loadingTimer = setTimeout(() => setLoading(true), LOADING_DELAY_MS);
     const inicio = new Date(dataInicio + "T00:00:00").toISOString();
     const fim = new Date(dataFim + "T23:59:59").toISOString();
     const params = new URLSearchParams({ inicio, fim, page, pageSize: PAGE_SIZE });
     if (atendenteId) params.set("atendenteId", atendenteId);
-    fetch(`/api/agendamentos?${params}`)
-      .then((r) => r.json())
+    if (buscaAplicada) params.set("cliente", buscaAplicada);
+    fetch(`/api/agendamentos?${params}`, { signal: controller.signal })
+      .then((r) => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json();
+      })
       .then(({ data, total }) => {
         clearTimeout(loadingTimer);
         setAgendamentos(data);
         setTotalAgendamentos(total);
+        setLoading(false);
+      })
+      .catch((e) => {
+        clearTimeout(loadingTimer);
+        if (e.name === "AbortError") return;
+        console.error("Erro ao carregar agendamentos:", e);
         setLoading(false);
       });
   }
@@ -512,6 +539,28 @@ export default function AgendamentosClient() {
             <ChevronRight size={15} />
           </button>
         </div>
+        <div className="relative ml-auto w-full sm:w-64">
+          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+          <input
+            type="search"
+            value={busca}
+            onChange={(e) => setBusca(e.target.value)}
+            placeholder="Buscar cliente"
+            aria-label="Buscar por nome do cliente"
+            maxLength={100}
+            className="w-full border border-gray-200 rounded-xl pl-9 pr-8 py-1.5 text-sm text-gray-700 bg-white placeholder:text-gray-400 hover:border-gray-300 focus:outline-none focus:border-purple-400 focus:ring-2 focus:ring-purple-200 transition-colors [&::-webkit-search-cancel-button]:hidden"
+          />
+          {busca && (
+            <button
+              type="button"
+              onClick={() => setBusca("")}
+              aria-label="Limpar busca"
+              className="absolute right-2 top-1/2 -translate-y-1/2 w-5 h-5 flex items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition"
+            >
+              <X size={13} />
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Lista */}
@@ -520,7 +569,9 @@ export default function AgendamentosClient() {
         <SkeletonAgendamentosList />
       ) : dias.length === 0 ? (
         <div className="text-center py-20 text-gray-400 text-sm">
-          Nenhum agendamento nesse período.
+          {buscaAplicada
+            ? `Nenhum agendamento de "${buscaAplicada}" nesse período.`
+            : "Nenhum agendamento nesse período."}
         </div>
       ) : (
         <div className="flex flex-col gap-8">

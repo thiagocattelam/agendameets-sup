@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { autenticar, semPermissao } from "@/lib/autorizacao";
 import { selectAgendamento } from "@/lib/camposPublicos";
 import { criarEvento, getUsuarioComTokens } from "@/lib/googleCalendar";
+import { idsAgendamentosPorCliente, normalizarBusca } from "@/lib/buscaCliente";
 
 export async function GET(request) {
   const { ability, erro } = await autenticar();
@@ -27,6 +28,12 @@ export async function GET(request) {
 
   if (atendenteId) {
     where.atendenteId = atendenteId;
+  }
+
+  const palavras = normalizarBusca(searchParams.get("cliente"));
+  if (palavras.length) {
+    const periodo = inicio && fim ? { inicio: new Date(inicio), fim: new Date(fim) } : {};
+    where.id = { in: await idsAgendamentosPorCliente(palavras, periodo) };
   }
 
   const [data, total] = await Promise.all([
