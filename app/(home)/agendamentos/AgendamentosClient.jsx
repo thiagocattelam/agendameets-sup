@@ -23,6 +23,17 @@ function formatDateDisplay(dateStr) {
   return new Date(dateStr + "T12:00:00").toLocaleDateString("pt-BR");
 }
 
+// Reserva a largura de uma data completa: o botão não muda de tamanho enquanto
+// a data final está vazia ("—"), então o calendário não se desloca entre os cliques.
+function DataSlot({ valor }) {
+  return (
+    <span className="inline-grid tabular-nums">
+      <span className="invisible col-start-1 row-start-1" aria-hidden="true">00/00/0000</span>
+      <span className="col-start-1 row-start-1 text-center">{valor}</span>
+    </span>
+  );
+}
+
 const DateRangeInput = forwardRef(
   ({ dataInicio, dataFim, onToggle, externalRef, isOpen }, ref) => {
     const mergedRef = (el) => {
@@ -35,11 +46,11 @@ const DateRangeInput = forwardRef(
         type="button"
         onClick={onToggle}
         ref={mergedRef}
-        className={`flex items-center gap-2 text-sm text-gray-700 bg-gray-50 border rounded-full px-4 py-1.5 focus:outline-none cursor-pointer whitespace-nowrap min-w-[190px] transition-colors ${isOpen ? "border-purple-400 ring-2 ring-purple-200" : "border-gray-200"}`}
+        className={`flex items-center gap-2 text-sm text-gray-700 bg-gray-50 border rounded-full px-4 py-1.5 focus:outline-none cursor-pointer whitespace-nowrap transition-colors ${isOpen ? "border-purple-400 ring-2 ring-purple-200" : "border-gray-200"}`}
       >
-        <span>{formatDateDisplay(dataInicio)}</span>
+        <DataSlot valor={formatDateDisplay(dataInicio)} />
         <span className="text-gray-300">–</span>
-        <span>{formatDateDisplay(dataFim)}</span>
+        <DataSlot valor={formatDateDisplay(dataFim)} />
         <CalendarDays size={14} className="text-gray-400 ml-1" />
       </button>
     );
@@ -443,6 +454,7 @@ export default function AgendamentosClient() {
             setCalendarAberto(false);
           }}
           portalId="datepicker-portal"
+          popperPlacement="bottom-start"
           dateFormat="dd/MM/yyyy"
           locale="pt-BR"
           renderCustomHeader={({
